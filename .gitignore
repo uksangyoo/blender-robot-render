@@ -1,0 +1,8 @@
+outputs/
+assets/hdri/*.exr
+assets/hdri/*.hdr
+__pycache__/
+*.pyc
+.venv/
+.uv-cache/
+*.blend1
