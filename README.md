@@ -1,6 +1,6 @@
 
 
-## Quickstart
+## Quickstart (GaP only)
 
 ```bash
 # 1. Replay one trial (run from graph-as-policy so libero is on PYTHONPATH)
@@ -21,26 +21,7 @@ uv run python scripts/render_trial.py \
 
 ## Peg-climb policy renders (xArm7 + LEAP hand)
 
-Photoreal renders of a trained `vibereact` PegClimb PPO policy (xArm7 arm +
-LEAP hand finger-gaiting up a chips-can "peg"). The peg is recoloured light
-blue; the robot keeps its proper xArm white / LEAP black PBR materials.
 
-These scripts reuse `render/build_scene.py`'s helpers (mesh import, PBR
-materials, lighting, Cycles/OPTIX config) but with peg-climb-specific body and
-material logic — no Franka-Panda mesh substitution.
-
-### Environment
-
-`bpy>=4.5` needs Python 3.11. The `vibereact` policy env (`lerobot`) is 3.10,
-so use **two** envs:
-
-```bash
-# bpy env (build + render)
-conda create -y -n blender-render python=3.11
-conda run -n blender-render python -m pip install \
-    "bpy>=4.5,<4.6" "numpy>=1.24,<2" "Pillow>=10" "pyyaml>=6" "imageio[ffmpeg]>=2.34"
-# rollout/export uses the existing `lerobot` env (mujoco + stable-baselines3).
-```
 
 ### One render (best of a few seeds)
 
