@@ -18,3 +18,63 @@ uv run python scripts/render_trial.py \
     --out outputs/trial_15/render.mp4
 ```
 
+
+## Peg-climb policy renders (xArm7 + LEAP hand)
+
+Photoreal renders of a trained `vibereact` PegClimb PPO policy (xArm7 arm +
+LEAP hand finger-gaiting up a chips-can "peg"). The peg is recoloured light
+blue; the robot keeps its proper xArm white / LEAP black PBR materials.
+
+These scripts reuse `render/build_scene.py`'s helpers (mesh import, PBR
+materials, lighting, Cycles/OPTIX config) but with peg-climb-specific body and
+material logic — no Franka-Panda mesh substitution.
+
+### Environment
+
+`bpy>=4.5` needs Python 3.11. The `vibereact` policy env (`lerobot`) is 3.10,
+so use **two** envs:
+
+```bash
+# bpy env (build + render)
+conda create -y -n blender-render python=3.11
+conda run -n blender-render python -m pip install \
+    "bpy>=4.5,<4.6" "numpy>=1.24,<2" "Pillow>=10" "pyyaml>=6" "imageio[ffmpeg]>=2.34"
+# rollout/export uses the existing `lerobot` env (mujoco + stable-baselines3).
+```
+
+### One render (best of a few seeds)
+
+```bash
+cd ~/vibereact          # repo root with the POLICY package
+
+# 1. Roll out the policy, pick the best episode, dump scene.json / traj.npz.
+PYTHONPATH=$PWD MUJOCO_GL=egl conda run -n lerobot --no-capture-output python \
+    thirdparty/blender-robot-render/render/replay_peg_climb.py \
+    --policy output/policies/vibeact_paper_peg_climb_dense_seed3/best_success.zip \
+    --out   thirdparty/blender-robot-render/outputs/peg_climb_seed3 \
+    --seeds 1 0 4 3 --randomize
+
+# 2. Assemble the .blend (light-blue peg, textured robot).
+conda run -n blender-render python \
+    thirdparty/blender-robot-render/render/build_scene_pegclimb.py \
+    --replay-dir   thirdparty/blender-robot-render/outputs/peg_climb_seed3 \
+    --output-blend thirdparty/blender-robot-render/outputs/peg_climb_seed3/scene.blend
+
+# 3. Render frames + mp4 (enables every OPTIX GPU).
+conda run -n blender-render python \
+    thirdparty/blender-robot-render/render/render_pegclimb.py \
+    --blend   thirdparty/blender-robot-render/outputs/peg_climb_seed3/scene.blend \
+    --out-dir thirdparty/blender-robot-render/outputs/peg_climb_seed3/frames \
+    --video   thirdparty/blender-robot-render/outputs/peg_climb_seed3/peg_climb.mp4 \
+    --samples 160 --fps 30
+```
+
+The peg colour is the `PEG_LIGHT_BLUE` constant in `build_scene_pegclimb.py`.
+
+### Batch: N trials end-to-end
+
+```bash
+# Renders N=10 trials (one rollout per seed) -> per-trial mp4. Safe to run in tmux.
+bash thirdparty/blender-robot-render/scripts/render_peg_climb_trials.sh 10
+```
+
