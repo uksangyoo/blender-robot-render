@@ -168,6 +168,11 @@ def add_markers(scene: dict, task: str) -> None:
         # A radial stripe across the nut's top face (6-fold symmetric otherwise).
         body["geoms"].append(dict(name="marker_screen", type="box", size=[0.0095, 0.0022, 0.0006],
                                   local_pos=[0.0185, 0.0, 0.0126], local_quat=ident))
+        # ...and a vertical stripe on one side flat, since the fingers hide the top
+        # face from the near-horizontal nut camera. The +x face is a flat (apothem
+        # 28 mm; corners at +/-30, 90, 150 deg) and the nut is 25 mm thick.
+        body["geoms"].append(dict(name="marker_screen", type="box", size=[0.0005, 0.0035, 0.0105],
+                                  local_pos=[0.0284, 0.0, 0.0], local_quat=ident))
         return
     if task in PAPER_TASKS:
         return
