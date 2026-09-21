@@ -59,3 +59,20 @@ The peg colour is the `PEG_LIGHT_BLUE` constant in `build_scene_pegclimb.py`.
 bash thirdparty/blender-robot-render/scripts/render_peg_climb_trials.sh 10
 ```
 
+
+
+## MPPI hose-routing run, side by side with the rig's film
+
+`render/render_mppi_run.py` renders a real-rig MPPI run from `~/Projects/hose-routing`: the YAM arms from the
+rig's own IK, the tracked hose, pegs and goal sides, and per planning cycle the sampled candidates coloured by
+MPPI cost, the model's forecasts and the chosen plan, next to the overhead camera's film. It only renders a
+bundle; the bundle comes from two hose-routing scripts, and one command runs all three:
+
+```bash
+cd ~/Projects/hose-routing
+python scripts/v5/render_mppi_run.py --run outputs/mppi_real_v5/run_20260917_150620 [--preview] [--frames 890:1544]
+```
+
+Method, colour mapping, coordinate frames and sync: `~/Projects/hose-routing/scripts/v5/mppi_blender_README.md`.
+The venv is this repo's pyproject (`.venv`, bpy 4.5.14). `replay_peg_climb.build_scene_graph` now takes an
+optional `mesh_files` map so another robot stack's MuJoCo model can reuse it.

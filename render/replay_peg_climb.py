@@ -112,10 +112,13 @@ def _build_mesh_file_map(model):
 # Scene graph: walk the compiled mjModel into a Blender-friendly JSON dict.
 # ---------------------------------------------------------------------------
 
-def build_scene_graph(model) -> dict:
+def build_scene_graph(model, mesh_files: dict | None = None) -> dict:
+    """``mesh_files`` ({mesh_id: (name, abs path)}) overrides the PegClimb asset
+    search, so a model from another robot stack can reuse this walk."""
     import mujoco
 
-    mesh_files = _build_mesh_file_map(model)
+    if mesh_files is None:
+        mesh_files = _build_mesh_file_map(model)
 
     type_to_str = {
         getattr(mujoco.mjtGeom, n): n.replace("mjGEOM_", "").lower()
