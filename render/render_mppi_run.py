@@ -494,6 +494,8 @@ class Scene:
         """
         from mathutils import Matrix
         ov = self.tl["overhead"]
+        if not ov:
+            raise SystemExit("--view overhead needs the rig's camera; this run has no film")
         K, T = np.asarray(ov["K"], float), np.asarray(ov["T_world_overhead"], float)
         w, h = ov["size"]
         M = np.eye(4)
@@ -533,6 +535,9 @@ class Composer:
 
     ``annotate`` adds back the captions (cycle / stage / detail), the run clock and pause badge on the film, and
     the bottom strip with peg sides and the run's timeline bar.
+
+    A run with no camera -- a simulated one -- has no second panel: ``timeline['filmed']`` is false and its
+    ``rgb`` entries are empty, so the video is the Blender panel alone at the same panel size.
     """
 
     def __init__(self, tl: dict, arrays, panel, annotate: bool = False):
@@ -540,8 +545,9 @@ class Composer:
         self.tl, self.A = tl, arrays
         self.pw, self.ph = panel
         self.annotate = annotate
+        self.filmed = bool(tl.get("filmed", True)) and any(tl.get("rgb") or [])
         self.sh = int(self.ph * 0.19) if annotate else 0
-        self.W, self.H = 2 * self.pw, self.ph + self.sh
+        self.W, self.H = (2 if self.filmed else 1) * self.pw, self.ph + self.sh
         k = self.ph / 720.0
         self.k = k
         self.f_title = ImageFont.truetype(FONT_BOLD, int(28 * k))
@@ -569,16 +575,19 @@ class Composer:
         if left.size != (self.pw, self.ph):
             left = left.resize((self.pw, self.ph), Image.LANCZOS)
         canvas.paste(left, (0, 0))
-        rgb = Image.open(tl["rgb"][f]).convert("RGB").resize((self.pw, self.ph), Image.LANCZOS)
+        rgb = Image.open(tl["rgb"][f]).convert("RGB").resize((self.pw, self.ph), Image.LANCZOS) \
+            if self.filmed else None
         if not self.annotate:
-            canvas.paste(rgb, (self.pw, 0))
+            if rgb is not None:
+                canvas.paste(rgb, (self.pw, 0))
             if cap.get("legend") == "mppi":            # the only text: the cost colour bar, while it applies
                 self._cost_bar(ImageDraw.Draw(canvas, "RGBA"), int(22 * k))
             return canvas
         paused = float(A["speed"][f]) == 0.0
-        if paused:
-            rgb = Image.blend(rgb, Image.new("RGB", rgb.size, (0, 0, 0)), 0.35)
-        canvas.paste(rgb, (self.pw, 0))
+        if rgb is not None:
+            if paused:
+                rgb = Image.blend(rgb, Image.new("RGB", rgb.size, (0, 0, 0)), 0.35)
+            canvas.paste(rgb, (self.pw, 0))
         d = ImageDraw.Draw(canvas, "RGBA")
         pad = int(22 * k)
 
@@ -586,14 +595,16 @@ class Composer:
         d.rectangle([0, 0, self.pw, int(86 * k)], fill=(0, 0, 0, 110))
         self._shadow_text(d, (pad, int(14 * k)), cap.get("title", ""), self.f_title, (245, 245, 247))
         self._shadow_text(d, (pad, int(52 * k)), cap.get("stage", ""), self.f_stage, (200, 202, 208))
-        d.text((self.pw - pad, int(14 * k)), "RECONSTRUCTED FROM THE RUN LOG", font=self.f_tag,
-               fill=(150, 150, 158), anchor="ra")
+        d.text((self.pw - pad, int(14 * k)),
+               "RECONSTRUCTED FROM THE RUN LOG" if self.filmed else "SIMULATED RUN  ·  REBUILT FROM ITS LOG",
+               font=self.f_tag, fill=(150, 150, 158), anchor="ra")
         self._legend(d, cap, pad)
 
-        # film panel: what it is, its clock, its speed
+        # film panel: what it is, its clock, its speed (a simulated run has none, so the badge moves left)
         x0 = self.pw + pad
-        d.rectangle([self.pw, 0, self.W, int(46 * k)], fill=(0, 0, 0, 120))
-        d.text((x0, int(14 * k)), "REAL RIG  ·  overhead camera", font=self.f_tag, fill=(235, 235, 238))
+        if self.filmed:
+            d.rectangle([self.pw, 0, self.W, int(46 * k)], fill=(0, 0, 0, 120))
+            d.text((x0, int(14 * k)), "REAL RIG  ·  overhead camera", font=self.f_tag, fill=(235, 235, 238))
         rt = float(A["run_time"][f])
         clock = "run time %d:%04.1f" % (int(rt // 60), rt % 60)
         if paused:
@@ -603,22 +614,25 @@ class Composer:
         else:
             badge = "%g× real time" % float(A["speed"][f])
             colour = (120, 220, 170)
-        d.text((self.W - pad, int(14 * k)), "%s   %s" % (clock, badge), font=self.f_tag, fill=colour, anchor="ra")
+        d.text((self.W - pad, int(14 * k)), "%s   %s" % (clock, badge) if self.filmed else badge,
+               font=self.f_tag, fill=colour, anchor="ra")
 
         # strip: detail, peg sides, the run's timeline with a playhead
         y0 = self.ph
         d.rectangle([0, y0, self.W, self.H], fill=(14, 14, 17))
         d.text((pad, y0 + int(16 * k)), cap.get("detail", ""), font=self.f_detail, fill=(220, 220, 226))
-        sides = A["pegs"][f]
+        # one dot per LANDMARK peg -- the goal says nothing about the others, so they are not shown
+        row = [int(l["peg"]) for l in tl["landmarks"]] or list(range(len(A["pegs"][f])))
+        sides = [float(A["pegs"][f][i]) for i in row]
         xs = self.W - pad - int(40 * k) * len(sides)
         d.text((xs - int(12 * k), y0 + int(18 * k)), "peg sides", font=self.f_small, fill=(170, 170, 178), anchor="ra")
-        for i, s in enumerate(sides):
+        for i, (peg, s) in enumerate(zip(row, sides)):
             c = tuple(int(255 * (BAD_RGB[j] + float(s) * (OK_RGB[j] - BAD_RGB[j]))) for j in range(3))
             cx = xs + int(40 * k) * i + int(14 * k)
             cy = y0 + int(28 * k)
             r = int(13 * k)
             d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
-            d.text((cx, cy), "p%d" % i, font=self.f_tag, fill=(10, 10, 12), anchor="mm")
+            d.text((cx, cy), "p%d" % peg, font=self.f_tag, fill=(10, 10, 12), anchor="mm")
         self._timeline(d, f, y0 + int(64 * k), pad)
         return canvas
 

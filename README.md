@@ -63,16 +63,30 @@ bash thirdparty/blender-robot-render/scripts/render_peg_climb_trials.sh 10
 
 ## MPPI hose-routing run, side by side with the rig's film
 
-`render/render_mppi_run.py` renders a real-rig MPPI run from `~/Projects/hose-routing`: the YAM arms from the
-rig's own IK, the tracked hose, pegs and goal sides, and per planning cycle the sampled candidates coloured by
-MPPI cost, the model's forecasts and the chosen plan, next to the overhead camera's film. It only renders a
-bundle; the bundle comes from two hose-routing scripts, and one command runs all three:
+The complete rendering pipeline is in `scripts/v5/` and `render/render_mppi_run.py`:
+YAM robot tracks, the hose/MPPI timeline, candidate ghost arms, and a Blender panel
+beside the overhead camera film. Planner/IK libraries, meshes and recorded runs
+come from the sibling `hose-routing` checkout (override with `HOSE_ROUTING_ROOT`).
 
 ```bash
-cd ~/Projects/hose-routing
-python scripts/v5/render_mppi_run.py --run outputs/mppi_real_v5/run_20260917_150620 [--preview] [--frames 890:1544]
+cd ~/Projects/blender-robot-render
+python scripts/v5/render_mppi_run.py \
+    --run ../hose-routing/outputs/mppi_real_v5/run_20260917_150620 \
+    --output outputs/mppi_run_visualization.mp4
+# Add --preview --frames 890:1544 to render just cycle 1 at reduced quality.
 ```
 
-Method, colour mapping, coordinate frames and sync: `~/Projects/hose-routing/scripts/v5/mppi_blender_README.md`.
-The venv is this repo's pyproject (`.venv`, bpy 4.5.14). `replay_peg_climb.build_scene_graph` now takes an
-optional `mesh_files` map so another robot stack's MuJoCo model can reuse it.
+To render an already prepared bundle, use the Blender environment directly:
+
+```bash
+.venv/bin/python render/render_mppi_run.py \
+    --bundle ../hose-routing/outputs/mppi_real_v5/run_20260917_150620/blender \
+    --out-dir outputs/mppi_run/frames \
+    --output outputs/mppi_run_visualization.mp4
+```
+
+The export stages use hose-routing's `.venv-v5` and the YAM stack's `.venv_trace`;
+the rendering stage uses this repo's `.venv` (bpy 4.5). Prepared bundles reference
+external film frames and meshes, so those assets must remain available.
+See [the pipeline documentation](scripts/v5/mppi_blender_README.md) for flags,
+input formats, colour mapping, coordinate frames and synchronisation.
